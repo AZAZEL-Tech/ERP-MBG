@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dapur MBG - Sistem Logistik Pangan & Keuangan SPPG</title>
+  <meta name="description" content="Aplikasi pencatatan bahan pangan, stok sisa, bahan terbuang, dan keuangan laba-rugi Satuan Pelayanan Pemenuhan Gizi (SPPG) Makan Bergizi Gratis">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <div class="app-layout">
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="app-sidebar">
+      <div class="sidebar-header">
+        <div class="brand-badge">SPPG Dapur MBG</div>
+        <div class="brand-title">Dapur<span>MBG</span></div>
+        <div class="brand-subtitle">Manajemen Pangan & Keuangan</div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Menu Utama</div>
+        <a href="#dashboard" class="nav-item active" data-tab="dashboard">
+          <span class="nav-icon">📊</span>
+          <span>Dashboard & Metrik</span>
+        </a>
+
+        <div class="nav-section-title">Logistik Pangan</div>
+        <a href="#purchases" class="nav-item" data-tab="purchases">
+          <span class="nav-icon">🛒</span>
+          <span>Pembelian Bahan</span>
+        </a>
+        <a href="#inventory" class="nav-item" data-tab="inventory">
+          <span class="nav-icon">📦</span>
+          <span>Stok Sisa Dapur</span>
+        </a>
+        <a href="#waste" class="nav-item" data-tab="waste">
+          <span class="nav-icon">🗑️</span>
+          <span>Bahan Dibuang (Waste)</span>
+        </a>
+
+        <div class="nav-section-title">Finansial & Akuntansi</div>
+        <a href="#finances" class="nav-item" data-tab="finances">
+          <span class="nav-icon">💰</span>
+          <span>Kas & Laba / Rugi</span>
+        </a>
+        <a href="#reports" class="nav-item" data-tab="reports">
+          <span class="nav-icon">🖨️</span>
+          <span>Cetak & Ekspor Laporan</span>
+        </a>
+
+        <div class="nav-section-title">Sistem</div>
+        <a href="#settings" class="nav-item" data-tab="settings">
+          <span class="nav-icon">⚙️</span>
+          <span>Pengaturan SPPG</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="badge-live">
+          <span class="pulse-dot"></span>
+          <span>Sistem Dapur Aktif</span>
+        </div>
+        <div>Offline-Ready &bull; v2.0 SPPG</div>
+      </div>
+    </aside>
+
+    <!-- MAIN APP WORKSPACE -->
+    <main class="app-main">
+      <!-- TOPBAR HEADER -->
+      <header class="app-header">
+        <div class="header-left">
+          <button id="mobile-menu-btn" class="mobile-menu-toggle" aria-label="Buka menu">☰</button>
+          <div>
+            <div class="kitchen-meta-title" id="header-sppg-title">Dapur MBG Mandiri</div>
+            <div class="kitchen-location-tag" id="header-sppg-loc">Satuan Pelayanan Pemenuhan Gizi</div>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- Periode Filter: Hari Ini, Minggu Ini, Bulan Ini, Semua -->
+          <div class="period-filter-group" title="Pilih rentang waktu data yang ditampilkan">
+            <button class="period-btn active" data-period="today">Hari Ini</button>
+            <button class="period-btn" data-period="this_week">Minggu Ini</button>
+            <button class="period-btn" data-period="this_month">Bulan Ini</button>
+            <button class="period-btn" data-period="all">Semua</button>
+          </div>
+
+          <button class="btn btn-primary" onclick="openAddPurchaseModal()">
+            <span>+</span>
+            <span>Catat Belanja</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT BODY -->
+      <div class="page-body">
+
+        <!-- ============================================================= -->
+        <!-- VIEW 1: DASHBOARD UTAMA -->
+        <!-- ============================================================= -->
+        <section id="view-dashboard" class="view-section active">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Dashboard Operasional & Keuangan Dapur</h2>
+              <p class="section-description">Monitoring real-time belanja pangan, stok inventaris, dan neraca surplus-defisit anggaran MBG</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline btn-sm" onclick="switchTab('reports')">
+                <span>🖨️</span> Cetak Laporan
+              </button>
+            </div>
+          </div>
+
+          <!-- Target Porsi MBG Card -->
+          <div class="target-box">
+            <div class="target-box-inner">
+              <div class="target-item">
+                <h4>Target Penyediaan</h4>
+                <p id="dash-target-portions">1.200 Porsi</p>
+                <small>Siswa Penerima MBG Harian</small>
+              </div>
+              <div class="target-item">
+                <h4>Pagu Anggaran</h4>
+                <p id="dash-budget-per-portion">Rp 15.000</p>
+                <small>Standar Alokasi per Porsi</small>
+              </div>
+              <div class="target-item">
+                <h4>Realisasi Biaya Bahan</h4>
+                <p id="dash-actual-portion-cost">Rp 0</p>
+                <small>Food Cost Aktual / Porsi</small>
+              </div>
+              <div class="target-item">
+                <h4>Efisiensi Anggaran</h4>
+                <p id="dash-efficiency-pct" style="color: #34d399;">0% Efisiensi</p>
+                <small>Margin Penghematan Mutu</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cards Grid 1: Keuangan & Saldo -->
+          <div class="metrics-grid">
+            <!-- Saldo Kas Riil -->
+            <div class="metric-card card-theme-balance">
+              <div class="metric-top">
+                <span class="metric-label">Saldo Kas Berjalan</span>
+                <div class="metric-icon-wrap">💳</div>
+              </div>
+              <div class="metric-val money" id="dash-balance">Rp 0</div>
+              <div class="metric-footer" style="color: #2563eb;">
+                <span>Total kas fisik & rekening tersedia</span>
+              </div>
+            </div>
+
+            <!-- Uang Masuk Periode -->
+            <div class="metric-card card-theme-income">
+              <div class="metric-top">
+                <span class="metric-label">Uang Masuk (Periode Ini)</span>
+                <div class="metric-icon-wrap">📥</div>
+              </div>
+              <div class="metric-val money" id="dash-income" style="color: #16a34a;">Rp 0</div>
+              <div class="metric-footer" style="color: #16a34a;">
+                <span>Dropping dana anggaran MBG</span>
+              </div>
+            </div>
+
+            <!-- Pengeluaran Periode -->
+            <div class="metric-card card-theme-expense">
+              <div class="metric-top">
+                <span class="metric-label">Uang Keluar (Periode Ini)</span>
+                <div class="metric-icon-wrap">📤</div>
+              </div>
+              <div class="metric-val money" id="dash-expense" style="color: #dc2626;">Rp 0</div>
+              <div class="metric-footer" style="color: #dc2626;">
+                <span>Belanja pangan & operasional</span>
+              </div>
+            </div>
+
+            <!-- Laba / Rugi (Surplus / Defisit) -->
+            <div class="metric-card card-theme-profit">
+              <div class="metric-top">
+                <span class="metric-label">Laba / Rugi (Surplus/Defisit)</span>
+                <div class="metric-icon-wrap">⚖️</div>
+              </div>
+              <div class="metric-val money" id="dash-profit">Rp 0</div>
+              <div class="metric-footer">
+                <span id="dash-profit-badge" class="badge-surplus">Surplus (Untung)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cards Grid 2: Logistik Pangan & Waste -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-top">
+                <span class="metric-label">Belanja Bahan Pangan</span>
+                <div class="metric-icon-wrap" style="background: #f0fdf4; color: #059669;">🥬</div>
+              </div>
+              <div class="metric-val money" id="dash-purchases-spent">Rp 0</div>
+              <div class="metric-footer" style="color: #059669;">
+                <span id="dash-purchases-qty">0 kg/unit dibeli</span>
+              </div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-top">
+                <span class="metric-label">Stok Sisa Tersimpan</span>
+                <div class="metric-icon-wrap" style="background: #fef3c7; color: #d97706;">📦</div>
+              </div>
+              <div class="metric-val" id="dash-inventory-count">0 Item</div>
+              <div class="metric-footer" style="color: #d97706;">
+                <span>Aman di gudang & chiller dapur</span>
+              </div>
+            </div>
+
+            <div class="metric-card card-theme-waste">
+              <div class="metric-top">
+                <span class="metric-label">Kerugian Bahan Dibuang</span>
+                <div class="metric-icon-wrap">🗑️</div>
+              </div>
+              <div class="metric-val money" id="dash-waste-loss" style="color: #e11d48;">Rp 0</div>
+              <div class="metric-footer" style="color: #e11d48;">
+                <span id="dash-waste-qty">0 kg food waste</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="dashboard-grid-row">
+            <!-- Canvas Bar Chart Keuangan -->
+            <div class="panel-card">
+              <div class="panel-title">
+                <span>Perbandingan Arus Kas (Periode Terpilih)</span>
+                <span class="panel-title-badge">Grafik Finansial</span>
+              </div>
+              <canvas id="canvas-finance-bar" height="240"></canvas>
+            </div>
+
+            <!-- Canvas Doughnut Kategori Bahan Pangan -->
+            <div class="panel-card">
+              <div class="panel-title">
+                <span>Proporsi Belanja Bahan Pangan</span>
+                <span class="panel-title-badge">Kategori Pangan</span>
+              </div>
+              <canvas id="canvas-category-doughnut" height="240"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 2: PEMBELIAN BAHAN PANGAN -->
+        <!-- ============================================================= -->
+        <section id="view-purchases" class="view-section">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Pencatatan Pembelian Bahan Pangan</h2>
+              <p class="section-description">Catat belanja harian pasar, distributor sayur, daging, beras, buah dan bumbu dapur MBG</p>
+            </div>
+            <button class="btn btn-primary" onclick="openAddPurchaseModal()">
+              <span>+</span> Catat Pembelian Baru
+            </button>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="toolbar-container">
+            <div class="toolbar-filters">
+              <input type="text" id="search-purchases" class="input-search" placeholder="Cari nama bahan / supplier...">
+              <select id="filter-cat-purchases" class="select-filter">
+                <option value="ALL">Semua Kategori</option>
+                <option value="Karbohidrat">Karbohidrat (Beras, dll)</option>
+                <option value="Protein Hewani">Protein Hewani (Ayam, Ikan, Daging, Telur)</option>
+                <option value="Protein Nabati">Protein Nabati (Tempe, Tahu)</option>
+                <option value="Sayuran">Sayuran Segar</option>
+                <option value="Buah-buahan">Buah-buahan</option>
+                <option value="Susu & Pelengkap">Susu & Minuman</option>
+                <option value="Minyak & Bumbu">Minyak & Bumbu Dapur</option>
+              </select>
+            </div>
+            <span style="font-size: 0.82rem; color: #64748b;">💡 Tip: Centang "Catat otomatis ke kas keluar" untuk memudahkan akuntansi</span>
+          </div>
+
+          <!-- Table -->
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;" class="text-center">No</th>
+                  <th>Tanggal</th>
+                  <th>Nama Bahan Pangan</th>
+                  <th>Kategori</th>
+                  <th class="text-right">Kuantitas</th>
+                  <th class="text-right">Harga Satuan</th>
+                  <th class="text-right">Total Biaya</th>
+                  <th>Pemasok / Toko</th>
+                  <th style="width: 60px;" class="text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="purchases-table-body">
+                <!-- Dynamically loaded -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 3: STOK SISA BAHAN (INVENTORY) -->
+        <!-- ============================================================= -->
+        <section id="view-inventory" class="view-section">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Pencatatan Stok Sisa Bahan Pangan</h2>
+              <p class="section-description">Pantau bahan yang belum habis setelah shift memasak untuk mencegah pemborosan</p>
+            </div>
+            <button class="btn btn-primary" onclick="openAddInventoryModal()">
+              <span>+</span> Catat Sisa Bahan
+            </button>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="toolbar-container">
+            <div class="toolbar-filters">
+              <input type="text" id="search-inventory" class="input-search" placeholder="Cari nama stok sisa...">
+              <select id="filter-cond-inventory" class="select-filter">
+                <option value="ALL">Semua Kondisi</option>
+                <option value="Baik / Segar">Baik / Segar</option>
+                <option value="Perlu Segera Diolah">Perlu Segera Diolah</option>
+                <option value="Perlu Dipantau">Perlu Dipantau</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;" class="text-center">No</th>
+                  <th>Nama Bahan</th>
+                  <th>Kategori</th>
+                  <th class="text-right">Sisa Stok</th>
+                  <th>Kondisi Bahan</th>
+                  <th>Lokasi Gudang / Rak</th>
+                  <th>Catatan Petugas</th>
+                  <th style="width: 60px;" class="text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-table-body">
+                <!-- Dynamically loaded -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 4: BAHAN DIBUANG (FOOD WASTE) -->
+        <!-- ============================================================= -->
+        <section id="view-waste" class="view-section">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Pencatatan Bahan Terbuang (Food Waste & Kerusakan)</h2>
+              <p class="section-description">Catat bahan yang busuk, layu, rusak transit, atau kadaluarsa untuk evaluasi mutu dan efisiensi</p>
+            </div>
+            <button class="btn btn-danger" onclick="openAddWasteModal()">
+              <span>+</span> Catat Bahan Dibuang
+            </button>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="toolbar-container">
+            <div class="toolbar-filters">
+              <input type="text" id="search-waste" class="input-search" placeholder="Cari nama bahan / alasan...">
+              <select id="filter-reason-waste" class="select-filter">
+                <option value="ALL">Semua Alasan</option>
+                <option value="Busuk / Layu saat sortir">Busuk / Layu saat sortir</option>
+                <option value="Kerusakan Transit / Pengiriman">Kerusakan Transit / Pengiriman</option>
+                <option value="Kadaluarsa / Melewati Tanggal">Kadaluarsa / Melewati Tanggal</option>
+                <option value="Sisa Olahan / Masakan Berlebih">Sisa Olahan / Masakan Berlebih</option>
+                <option value="Tidak Lolos QC Mutu Gizi">Tidak Lolos QC Mutu Gizi</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;" class="text-center">No</th>
+                  <th>Tanggal</th>
+                  <th>Nama Bahan</th>
+                  <th class="text-right">Jumlah Dibuang</th>
+                  <th class="text-right">Taksiran Kerugian</th>
+                  <th>Alasan Pembuangan</th>
+                  <th>Keterangan / Evaluasi</th>
+                  <th style="width: 60px;" class="text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="waste-table-body">
+                <!-- Dynamically loaded -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 5: KEUANGAN & LABA RUGI -->
+        <!-- ============================================================= -->
+        <section id="view-finances" class="view-section">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Buku Kas & Laba / Rugi (Surplus-Defisit)</h2>
+              <p class="section-description">Pencatatan arus uang masuk, uang keluar operasional dapur, dan saldo kas riil MBG</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-success" onclick="openAddFinanceModal('INCOME')">
+                <span>+</span> Catat Uang Masuk
+              </button>
+              <button class="btn btn-danger" onclick="openAddFinanceModal('EXPENSE')">
+                <span>+</span> Catat Uang Keluar
+              </button>
+            </div>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="toolbar-container">
+            <div class="toolbar-filters">
+              <input type="text" id="search-finance" class="input-search" placeholder="Cari uraian transaksi / pihak...">
+              <select id="filter-type-finance" class="select-filter">
+                <option value="ALL">Semua Jenis Transaksi</option>
+                <option value="INCOME">Uang Masuk Saja</option>
+                <option value="EXPENSE">Uang Keluar Saja</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;" class="text-center">No</th>
+                  <th>Tanggal</th>
+                  <th>Jenis Arus Kas</th>
+                  <th>Kategori</th>
+                  <th>Uraian Transaksi</th>
+                  <th>Pihak / Rekening</th>
+                  <th class="text-right">Nominal (Rp)</th>
+                  <th style="width: 60px;" class="text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="finance-table-body">
+                <!-- Dynamically loaded -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 6: CETAK & EKSPOR LAPORAN -->
+        <!-- ============================================================= -->
+        <section id="view-reports" class="view-section">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Pusat Cetak & Ekspor Laporan Resmi</h2>
+              <p class="section-description">Cetak laporan harian, mingguan, dan bulanan ke printer kertas A4, PDF, Struk Thermal, atau Excel</p>
+            </div>
+
+            <!-- Action Bar Laporan -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <select id="report-period-select" class="select-filter" style="font-weight: 700;">
+                <option value="today">Periode Harian (Hari Ini)</option>
+                <option value="this_week">Periode Mingguan (7 Hari Terakhir)</option>
+                <option value="this_month">Periode Bulanan (Bulan Ini)</option>
+                <option value="all">Semua Periode Kumulatif</option>
+              </select>
+
+              <button class="btn btn-primary" onclick="MBGReports.printReport('a4')">
+                <span>🖨️</span> Cetak / Simpan PDF (A4)
+              </button>
+
+              <button class="btn btn-outline" onclick="MBGReports.printReport('thermal')">
+                <span>🧾</span> Cetak Struk Thermal (80mm)
+              </button>
+
+              <button class="btn btn-success" onclick="MBGReports.exportToExcel()">
+                <span>📊</span> Ekspor ke Excel (.xls)
+              </button>
+
+              <button class="btn btn-outline" onclick="MBGReports.exportToCSV()">
+                <span>📄</span> Ekspor ke CSV
+              </button>
+            </div>
+          </div>
+
+          <!-- Preview Report Box -->
+          <div class="report-preview-container" id="report-a4-content">
+            <!-- Generated dynamically by reports.js -->
+            <div style="text-align: center; padding: 40px; color: #94a3b8;">
+              Memuat data laporan...
+            </div>
+          </div>
+
+          <!-- Thermal Receipt Box (hidden on screen, visible on thermal print) -->
+          <div class="thermal-receipt-preview" id="report-thermal-content">
+            <!-- Generated dynamically by reports.js -->
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 7: PENGATURAN DAPUR SPPG -->
+        <!-- ============================================================= -->
+        <section id="view-settings" class="view-section">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Pengaturan Profil & Parameter Dapur SPPG</h2>
+              <p class="section-description">Atur nama satuan pelayanan, penanggung jawab tanda tangan, target porsi, dan pagu anggaran</p>
+            </div>
+          </div>
+
+          <div class="panel-card" style="max-width: 800px;">
+            <form id="form-settings" onsubmit="handleSaveSettings(event)">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Nama Dapur / SPPG MBG</label>
+                  <input type="text" id="set-kitchen_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Wilayah Pelayanan / Kecamatan</label>
+                  <input type="text" id="set-service_area" class="form-control" required>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Nama Penanggung Jawab SPPG (Kepala SPPG)</label>
+                  <input type="text" id="set-manager_name" class="form-control" required>
+                  <div class="form-help">Akan muncul di tanda tangan kolom kanan laporan resmi</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Nama Bendahara / Petugas Keuangan</label>
+                  <input type="text" id="set-treasurer_name" class="form-control" required>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Kepala Juru Masak (Head Cook)</label>
+                  <input type="text" id="set-head_cook" class="form-control" required>
+                  <div class="form-help">Akan muncul di tanda tangan kolom kiri laporan resmi</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Target Porsi Harian</label>
+                  <input type="number" id="set-daily_target_portions" class="form-control" required>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Pagu Anggaran per Porsi (Rp)</label>
+                  <input type="number" id="set-budget_per_portion" class="form-control" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Sekolah Penerima MBG</label>
+                  <input type="text" id="set-active_schools" class="form-control" required>
+                </div>
+              </div>
+
+              <div style="margin-top: 18px; display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary">
+                  💾 Simpan Pengaturan
+                </button>
+              </div>
+            </form>
+
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <strong style="color: #dc2626;">Zona Data Contoh</strong>
+                <p style="font-size: 0.8rem; color: #64748b;">Reset semua data kembali ke contoh awal MBG jika diperlukan untuk simulasi</p>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="handleResetDemoData()" style="color: #dc2626; border-color: #fecaca;">
+                🔄 Reset Data Sampel
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: TAMBAH PEMBELIAN BAHAN PANGAN -->
+  <!-- ============================================================= -->
+  <div class="modal-overlay" id="modal-add-purchase">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">🛒 Catat Pembelian Bahan Pangan</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <form id="form-add-purchase" onsubmit="handleSavePurchase(event)">
+        <div class="modal-body">
+          <!-- Preset Bahan Umum (One-click) -->
+          <div class="form-group">
+            <label class="form-label">Pilih Bahan Cepat (Opsional)</label>
+            <div class="preset-tag-list" id="purchase-preset-chips"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tanggal Pembelian <span class="required">*</span></label>
+              <input type="date" id="p-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kategori Pangan <span class="required">*</span></label>
+              <select id="p-category" class="form-control" required>
+                <option value="Sayuran">Sayuran Segar</option>
+                <option value="Protein Hewani">Protein Hewani (Ayam, Telur, Ikan, Daging)</option>
+                <option value="Protein Nabati">Protein Nabati (Tempe, Tahu)</option>
+                <option value="Karbohidrat">Karbohidrat (Beras, Kentang, Jagung)</option>
+                <option value="Buah-buahan">Buah-buahan Segar</option>
+                <option value="Susu & Pelengkap">Susu & Minuman</option>
+                <option value="Minyak & Bumbu">Minyak & Bumbu Dapur</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Nama Bahan Pangan <span class="required">*</span></label>
+            <input type="text" id="p-name" class="form-control" placeholder="Contoh: Dada Ayam Fillet Segar" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Jumlah / Kuantitas <span class="required">*</span></label>
+              <input type="number" step="0.1" id="p-qty" class="form-control" placeholder="60" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Satuan <span class="required">*</span></label>
+              <select id="p-unit" class="form-control" required>
+                <option value="kg">kg (Kilogram)</option>
+                <option value="ikat">ikat</option>
+                <option value="potong">potong</option>
+                <option value="buah">buah</option>
+                <option value="kotak">kotak</option>
+                <option value="liter">liter</option>
+                <option value="butir">butir</option>
+                <option value="karung">karung</option>
+                <option value="bks">bungkus / pack</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Harga Satuan (Rp) <span class="required">*</span></label>
+              <input type="number" id="p-price" class="form-control" placeholder="38000" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Total Biaya Belanja (Rp)</label>
+              <input type="number" id="p-total" class="form-control" readonly style="font-weight: 700; color: #065f46;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Pemasok / Nama Toko / Pasar</label>
+              <input type="text" id="p-supplier" class="form-control" placeholder="Contoh: Pasar Induk Kramat">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Keterangan / Menu Masakan</label>
+              <input type="text" id="p-notes" class="form-control" placeholder="Contoh: Untuk menu opor ayam siang">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 8px;">
+            <label class="form-checkbox-label">
+              <input type="checkbox" id="p-auto-expense" checked>
+              <span>Otomatis catat pengeluaran belanja ini ke Buku Kas Keuangan</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline modal-cancel-btn">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Pembelian</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: CATAT SISA BAHAN (INVENTORY) -->
+  <!-- ============================================================= -->
+  <div class="modal-overlay" id="modal-add-inventory">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">📦 Catat Stok Sisa Bahan Dapur</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <form id="form-add-inventory" onsubmit="handleSaveInventory(event)">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tanggal Cek Fisik <span class="required">*</span></label>
+              <input type="date" id="inv-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kategori <span class="required">*</span></label>
+              <select id="inv-category" class="form-control" required>
+                <option value="Karbohidrat">Karbohidrat</option>
+                <option value="Protein Hewani">Protein Hewani</option>
+                <option value="Protein Nabati">Protein Nabati</option>
+                <option value="Sayuran">Sayuran Segar</option>
+                <option value="Buah-buahan">Buah-buahan</option>
+                <option value="Susu & Pelengkap">Susu & Minuman</option>
+                <option value="Minyak & Bumbu">Minyak & Bumbu Dapur</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Nama Bahan Pangan <span class="required">*</span></label>
+            <input type="text" id="inv-name" class="form-control" placeholder="Contoh: Beras Rojolele Super" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Kuantitas Sisa <span class="required">*</span></label>
+              <input type="number" step="0.1" id="inv-qty" class="form-control" placeholder="25" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Satuan <span class="required">*</span></label>
+              <select id="inv-unit" class="form-control" required>
+                <option value="kg">kg (Kilogram)</option>
+                <option value="ikat">ikat</option>
+                <option value="potong">potong</option>
+                <option value="buah">buah</option>
+                <option value="kotak">kotak</option>
+                <option value="liter">liter</option>
+                <option value="butir">butir</option>
+                <option value="karung">karung</option>
+                <option value="bks">bungkus / pack</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Kondisi Bahan</label>
+              <select id="inv-condition" class="form-control">
+                <option value="Baik / Segar">Baik / Segar</option>
+                <option value="Perlu Segera Diolah">Perlu Segera Diolah</option>
+                <option value="Perlu Dipantau">Perlu Dipantau</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Lokasi Penyimpanan</label>
+              <input type="text" id="inv-location" class="form-control" placeholder="Contoh: Chiller Sayur Rak 2">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Catatan Tambahan</label>
+            <input type="text" id="inv-notes" class="form-control" placeholder="Contoh: Rencana dimasak untuk besok pagi">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline modal-cancel-btn">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Stok Sisa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: CATAT BAHAN DIBUANG (WASTE) -->
+  <!-- ============================================================= -->
+  <div class="modal-overlay" id="modal-add-waste">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">🗑️ Catat Bahan Terbuang (Food Waste)</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <form id="form-add-waste" onsubmit="handleSaveWaste(event)">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tanggal Terbuang <span class="required">*</span></label>
+              <input type="date" id="w-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kategori <span class="required">*</span></label>
+              <select id="w-category" class="form-control" required>
+                <option value="Sayuran">Sayuran Segar</option>
+                <option value="Protein Hewani">Protein Hewani</option>
+                <option value="Protein Nabati">Protein Nabati</option>
+                <option value="Buah-buahan">Buah-buahan</option>
+                <option value="Karbohidrat">Karbohidrat</option>
+                <option value="Susu & Pelengkap">Susu & Minuman</option>
+                <option value="Minyak & Bumbu">Minyak & Bumbu</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Nama Bahan Pangan <span class="required">*</span></label>
+            <input type="text" id="w-name" class="form-control" placeholder="Contoh: Wortel Brastagi" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Kuantitas Dibuang <span class="required">*</span></label>
+              <input type="number" step="0.1" id="w-qty" class="form-control" placeholder="1.5" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Satuan <span class="required">*</span></label>
+              <select id="w-unit" class="form-control" required>
+                <option value="kg">kg (Kilogram)</option>
+                <option value="ikat">ikat</option>
+                <option value="potong">potong</option>
+                <option value="buah">buah</option>
+                <option value="kotak">kotak</option>
+                <option value="liter">liter</option>
+                <option value="butir">butir</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Taksiran Kerugian (Rp) <span class="required">*</span></label>
+              <input type="number" id="w-loss" class="form-control" placeholder="18000" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Alasan / Penyebab <span class="required">*</span></label>
+              <select id="w-reason" class="form-control" required>
+                <option value="Busuk / Layu saat sortir">Busuk / Layu saat sortir</option>
+                <option value="Kerusakan Transit / Pengiriman">Kerusakan Transit / Pengiriman</option>
+                <option value="Kadaluarsa / Melewati Tanggal">Kadaluarsa / Melewati Tanggal</option>
+                <option value="Sisa Olahan / Masakan Berlebih">Sisa Olahan / Masakan Berlebih</option>
+                <option value="Tidak Lolos QC Mutu Gizi">Tidak Lolos QC Mutu Gizi</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Catatan / Rencana Pencegahan</label>
+            <input type="text" id="w-notes" class="form-control" placeholder="Contoh: Sortir ketat saat kiriman dari supplier">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline modal-cancel-btn">Batal</button>
+          <button type="submit" class="btn btn-danger">Simpan Catatan Waste</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: CATAT TRANSAKSI KEUANGAN -->
+  <!-- ============================================================= -->
+  <div class="modal-overlay" id="modal-add-finance">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">💰 Catat Transaksi Arus Kas</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <form id="form-add-finance" onsubmit="handleSaveFinance(event)">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tanggal Transaksi <span class="required">*</span></label>
+              <input type="date" id="f-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jenis Arus Kas <span class="required">*</span></label>
+              <select id="f-type" class="form-control" onchange="updateFinanceCategoryOptions()" required>
+                <option value="INCOME">⬆️ Uang Masuk (Penerimaan)</option>
+                <option value="EXPENSE">⬇️ Uang Keluar (Pengeluaran)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Kategori Transaksi <span class="required">*</span></label>
+            <select id="f-category" class="form-control" required>
+              <!-- Filled dynamically by updateFinanceCategoryOptions() -->
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nominal Uang (Rp) <span class="required">*</span></label>
+              <input type="number" id="f-amount" class="form-control" placeholder="5000000" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">No. Referensi / Kuitansi</label>
+              <input type="text" id="f-ref" class="form-control" placeholder="Contoh: BKK-01/MBG/2026">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Uraian / Deskripsi <span class="required">*</span></label>
+            <input type="text" id="f-desc" class="form-control" placeholder="Contoh: Pencairan Kas Anggaran Minggu Ke-1" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Pihak Sumber / Penerima Uang</label>
+            <input type="text" id="f-party" class="form-control" placeholder="Contoh: Kasda / Toko Kemasan Sejahtera">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline modal-cancel-btn">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Transaksi Kas</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Anchor -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- SCRIPTS -->
+  <script src="/static/js/charts.js"></script>
+  <script src="/static/js/reports.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
