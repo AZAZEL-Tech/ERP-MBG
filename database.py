@@ -119,6 +119,28 @@ def init_db():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """)
 
+        # Tabel Pengeluaran Bahan Pangan (Barang Keluar / Pemakaian Dapur)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS `stock_out` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `date` DATE NOT NULL,
+            `item_name` VARCHAR(191) NOT NULL,
+            `category` VARCHAR(100) NOT NULL,
+            `quantity` DECIMAL(10,2) NOT NULL,
+            `unit` VARCHAR(50) NOT NULL,
+            `unit_price` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `total_price` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+            `purpose` VARCHAR(191) DEFAULT 'Pengolahan Menu MBG',
+            `recipient_school` VARCHAR(191) DEFAULT '',
+            `chef_or_staff` VARCHAR(191) DEFAULT '',
+            `notes` TEXT,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_so_date` (`date`),
+            INDEX `idx_so_cat` (`category`),
+            INDEX `idx_so_item` (`item_name`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """)
+
         # Tabel Pengaturan / Profil SPPG MBG
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS `settings` (
@@ -147,6 +169,15 @@ def init_db():
         row = cursor.fetchone()
         if row and row["cnt"] == 0:
             seed_sample_data(cursor)
+
+        # Cek apakah tabel stock_out kosong, jika ya isi data awal sampel barang keluar
+        cursor.execute("SELECT COUNT(*) as cnt FROM `stock_out`")
+        so_row = cursor.fetchone()
+        if so_row and so_row["cnt"] == 0:
+            seed_sample_stock_out(cursor)
+
+        # Sinkronkan pembelian ke kas & laba rugi otomatis
+        sync_purchases_to_finances(cursor)
 
     conn.close()
 
@@ -242,6 +273,75 @@ def seed_sample_data(cursor):
             INSERT INTO `finances` (`date`, `type`, `category`, `amount`, `description`, `source_or_recipient`, `ref_number`)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, fin)
+
+def seed_sample_stock_out(cursor):
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    two_days_ago = today - timedelta(days=2)
+
+    sample_stock_out = [
+        # Hari Ini - Pemakaian Menu MBG (Nasi, Ayam Kecap, Sayur Sop, Tempe, Pisang, Susu)
+        (today.isoformat(), "Beras Rojolele Super", "Karbohidrat", 65.0, "kg", 14500, 942500, "Nasi Siang 1.200 Siswa", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Masak porsi harian MBG"),
+        (today.isoformat(), "Daging Dada Ayam Fillet", "Protein Hewani", 55.0, "kg", 38000, 2090000, "Ayam Kecap Manis MBG", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Lauk utama protein hewani"),
+        (today.isoformat(), "Wortel Segar Brastagi", "Sayuran", 20.0, "kg", 12000, 240000, "Sayur Sop Pelengkap Gizi", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Sayuran segar vitamin A"),
+        (today.isoformat(), "Buncis Hijau Segar", "Sayuran", 18.0, "kg", 15000, 270000, "Campuran Sayur Sop", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Campuran sayur sop bening"),
+        (today.isoformat(), "Tempe Daun Segar", "Protein Nabati", 140.0, "potong", 2000, 280000, "Tempe Mendoan Gurih", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Lauk pendamping protein nabati"),
+        (today.isoformat(), "Buah Pisang Ambon", "Buah-buahan", 1200.0, "buah", 1500, 1800000, "Pencuci Mulut Siswa MBG", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Didistribusikan 1 buah per anak"),
+        (today.isoformat(), "Susu UHT MBG 125ml", "Susu & Pelengkap", 1155.0, "kotak", 3500, 4042500, "Minuman Pemenuhan Kalsium", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "1 kotak per porsi siswa"),
+        (today.isoformat(), "Minyak Goreng Sawit", "Minyak & Bumbu", 10.0, "liter", 17000, 170000, "Penggorengan Tempe & Ayam", "Dapur Utama", "Chef Agus Priyono", "Pemakaian minyak goreng"),
+        (today.isoformat(), "Bawang Merah & Putih", "Minyak & Bumbu", 6.0, "kg", 35000, 210000, "Bumbu Masak Sop & Ayam", "Dapur Utama", "Chef Agus Priyono", "Bumbu halus dapur"),
+
+        # Kemarin - Pemakaian Menu MBG (Nasi, Telur Balado, Sayur Bening Bayam, Tahu Bacem, Jeruk)
+        (yesterday.isoformat(), "Beras Rojolele Super", "Karbohidrat", 65.0, "kg", 14500, 942500, "Nasi Siang 1.200 Siswa", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Kebutuhan pokok"),
+        (yesterday.isoformat(), "Telur Ayam Negeri", "Protein Hewani", 70.0, "kg", 27000, 1890000, "Telur Balado Gurih", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Lauk telur rebus balado"),
+        (yesterday.isoformat(), "Bayam Hijau Segar", "Sayuran", 37.0, "ikat", 3000, 111000, "Sayur Bening Bayam Jagung", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Sayuran hijau segar"),
+        (yesterday.isoformat(), "Jagung Manis Pipil", "Sayuran", 18.0, "kg", 9000, 162000, "Pelengkap Sayur Bening", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Campuran sayur bayam"),
+        (yesterday.isoformat(), "Tahu Putih Sutra", "Protein Nabati", 115.0, "potong", 2000, 230000, "Tahu Bacem Gurih", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Olahan nabati"),
+        (yesterday.isoformat(), "Buah Jeruk Manis", "Buah-buahan", 115.0, "kg", 18000, 2070000, "Buah Segar Vitamin C", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Distribusi sekolah"),
+
+        # 2 Hari Lalu
+        (two_days_ago.isoformat(), "Ikan Kembung Segar", "Protein Hewani", 68.0, "kg", 32000, 2176000, "Ikan Goreng Tepung", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Lauk ikan kembung"),
+        (two_days_ago.isoformat(), "Kangkung Segar", "Sayuran", 48.0, "ikat", 3000, 144000, "Tumis Kangkung Saus Tiram", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Sayur tumis"),
+        (two_days_ago.isoformat(), "Beras Rojolele Super", "Karbohidrat", 65.0, "kg", 14500, 942500, "Nasi Siang 1.200 Siswa", "SDN 01 Harapan, SDN 02 Pagi, SMPN 01 Perintis", "Chef Agus Priyono", "Kebutuhan pokok")
+    ]
+
+    for so in sample_stock_out:
+        cursor.execute("""
+            INSERT INTO `stock_out` (`date`, `item_name`, `category`, `quantity`, `unit`, `unit_price`, `total_price`, `purpose`, `recipient_school`, `chef_or_staff`, `notes`)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, so)
+
+def sync_purchases_to_finances(cursor):
+    """
+    Sinkronisasi otomatis agar uang dari setiap pembelian barang langsung 100% masuk ke dalam kas dan laba rugi.
+    """
+    cursor.execute("SELECT id, date, item_name, quantity, unit, total_price, supplier FROM purchases")
+    purchases = cursor.fetchall()
+
+    for p in purchases:
+        ref = f"BELANJA-#{p['id']}"
+        cursor.execute("SELECT id FROM finances WHERE ref_number = %s", (ref,))
+        existing = cursor.fetchone()
+        if not existing:
+            desc = f"Belanja Bahan: {p['item_name']} ({p['quantity']} {p['unit']})"
+            if p['supplier']:
+                desc += f" dari {p['supplier']}"
+            cursor.execute("""
+                INSERT INTO `finances` (`date`, `type`, `category`, `amount`, `description`, `source_or_recipient`, `ref_number`)
+                VALUES (%s, 'EXPENSE', 'Belanja Bahan Pangan', %s, %s, %s, %s)
+            """, (
+                p['date'],
+                p['total_price'],
+                desc,
+                p['supplier'] or "Pemasok Pangan",
+                ref
+            ))
+
+    # Bersihkan nota rangkuman lama jika mutasi individual belanja sudah disinkronkan
+    cursor.execute("SELECT COUNT(*) as cnt FROM finances WHERE ref_number LIKE 'BELANJA-%'")
+    belanja_cnt = cursor.fetchone()
+    if belanja_cnt and belanja_cnt["cnt"] > 0:
+        cursor.execute("DELETE FROM finances WHERE ref_number IN ('NOTA-PASAR-01', 'NOTA-PASAR-02', 'NOTA-PASAR-03')")
 
 if __name__ == "__main__":
     init_db()

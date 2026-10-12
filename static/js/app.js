@@ -10,6 +10,8 @@ const AppState = {
   settings: {},
   stats: null,
   purchases: [],
+  stockOut: [],
+  mutations: [],
   inventory: [],
   waste: [],
   finances: []
@@ -70,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   loadDashboard();
   renderPresetChips();
+  renderStockOutPresetChips();
   
   // Set default dates on all date inputs
   document.querySelectorAll('input[type="date"]').forEach(inp => {
@@ -135,11 +138,33 @@ function initEventListeners() {
     pPrice.addEventListener('input', calcPurchaseTotal);
   }
 
+  // Stock Out Form Auto Calculation (Qty * Unit Price)
+  const soQty = document.getElementById('so-qty');
+  const soPrice = document.getElementById('so-price');
+  const soTotal = document.getElementById('so-total');
+  function calcStockOutTotal() {
+    const q = parseFloat(soQty.value) || 0;
+    const p = parseFloat(soPrice.value) || 0;
+    soTotal.value = (q * p).toString();
+  }
+  if (soQty && soPrice) {
+    soQty.addEventListener('input', calcStockOutTotal);
+    soPrice.addEventListener('input', calcStockOutTotal);
+  }
+
   // Search & Filter event listeners
   const searchPurchases = document.getElementById('search-purchases');
   const filterCatPurchases = document.getElementById('filter-cat-purchases');
   if (searchPurchases) searchPurchases.addEventListener('input', loadPurchases);
   if (filterCatPurchases) filterCatPurchases.addEventListener('change', loadPurchases);
+
+  const searchStockOut = document.getElementById('search-stock-out');
+  const filterCatStockOut = document.getElementById('filter-cat-stock-out');
+  if (searchStockOut) searchStockOut.addEventListener('input', loadStockOut);
+  if (filterCatStockOut) filterCatStockOut.addEventListener('change', loadStockOut);
+
+  const searchMutations = document.getElementById('search-mutations');
+  if (searchMutations) searchMutations.addEventListener('input', loadStockMutations);
 
   const searchInv = document.getElementById('search-inventory');
   const filterCondInv = document.getElementById('filter-cond-inventory');
@@ -191,6 +216,12 @@ function refreshCurrentView() {
     case 'purchases':
       loadPurchases();
       break;
+    case 'stock-out':
+      loadStockOut();
+      break;
+    case 'mutations':
+      loadStockMutations();
+      break;
     case 'inventory':
       loadInventory();
       break;
@@ -240,6 +271,14 @@ async function loadDashboard() {
     document.getElementById('dash-purchases-spent').textContent = formatRupiah(data.purchases.total_spent);
     document.getElementById('dash-purchases-qty').textContent = `${data.purchases.total_qty.toLocaleString('id-ID')} unit/kg`;
 
+    // Barang Keluar
+    if (data.stock_out) {
+      const soSpentEl = document.getElementById('dash-stock-out-spent');
+      const soQtyEl = document.getElementById('dash-stock-out-qty');
+      if (soSpentEl) soSpentEl.textContent = formatRupiah(data.stock_out.total_value);
+      if (soQtyEl) soQtyEl.textContent = `${data.stock_out.total_qty.toLocaleString('id-ID')} unit/kg dikeluarkan`;
+    }
+
     document.getElementById('dash-inventory-count').textContent = `${data.inventory.item_count} Item`;
     document.getElementById('dash-waste-loss').textContent = formatRupiah(data.waste.total_loss);
     document.getElementById('dash-waste-qty').textContent = `${data.waste.total_waste_qty} unit/kg dibuang`;
@@ -281,6 +320,22 @@ async function loadPurchases() {
     const list = await res.json();
     AppState.purchases = list;
 
+    // Hitung otomatis total pembelian (kuantitas dan total biaya)
+    const totalQty = list.reduce((sum, p) => sum + (parseFloat(p.quantity) || 0), 0);
+    const totalSpent = list.reduce((sum, p) => sum + (parseFloat(p.total_price) || 0), 0);
+
+    const sumCountEl = document.getElementById('purchases-sum-count');
+    const sumQtyEl = document.getElementById('purchases-sum-qty');
+    const sumTotalEl = document.getElementById('purchases-sum-total');
+    if (sumCountEl) sumCountEl.textContent = `${list.length} Transaksi`;
+    if (sumQtyEl) sumQtyEl.textContent = `${totalQty.toLocaleString('id-ID')} unit/kg`;
+    if (sumTotalEl) sumTotalEl.textContent = formatRupiah(totalSpent);
+
+    const footQtyEl = document.getElementById('purchases-foot-qty');
+    const footTotalEl = document.getElementById('purchases-foot-total');
+    if (footQtyEl) footQtyEl.textContent = `${totalQty.toLocaleString('id-ID')} unit/kg`;
+    if (footTotalEl) footTotalEl.textContent = formatRupiah(totalSpent);
+
     const tbody = document.getElementById('purchases-table-body');
     if (!tbody) return;
 
@@ -312,6 +367,240 @@ async function loadPurchases() {
 
   } catch (err) {
     console.error('loadPurchases error:', err);
+  }
+}
+
+// ==========================================
+// 2b. BARANG KELUAR (PEMAKAIAN MASAK) CONTROLLER
+// ==========================================
+async function loadStockOut() {
+  try {
+    const search = document.getElementById('search-stock-out') ? document.getElementById('search-stock-out').value : '';
+    const cat = document.getElementById('filter-cat-stock-out') ? document.getElementById('filter-cat-stock-out').value : 'ALL';
+    
+    let url = `/api/stock-out?1=1`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (cat && cat !== 'ALL') url += `&category=${encodeURIComponent(cat)}`;
+
+    const res = await fetch(url);
+    const list = await res.json();
+    AppState.stockOut = list;
+
+    // Setiap barang yang keluar ditotalkan secara otomatis (kuantitas dan total nilai)
+    const totalQty = list.reduce((sum, so) => sum + (parseFloat(so.quantity) || 0), 0);
+    const totalSpent = list.reduce((sum, so) => sum + (parseFloat(so.total_price) || 0), 0);
+
+    const sumCountEl = document.getElementById('so-sum-count');
+    const sumQtyEl = document.getElementById('so-sum-qty');
+    const sumTotalEl = document.getElementById('so-sum-total');
+    if (sumCountEl) sumCountEl.textContent = `${list.length} Transaksi`;
+    if (sumQtyEl) sumQtyEl.textContent = `${totalQty.toLocaleString('id-ID')} unit/kg`;
+    if (sumTotalEl) sumTotalEl.textContent = formatRupiah(totalSpent);
+
+    const footQtyEl = document.getElementById('so-foot-qty');
+    const footTotalEl = document.getElementById('so-foot-total');
+    if (footQtyEl) footQtyEl.textContent = `${totalQty.toLocaleString('id-ID')} unit/kg`;
+    if (footTotalEl) footTotalEl.textContent = formatRupiah(totalSpent);
+
+    const tbody = document.getElementById('stock-out-table-body');
+    if (!tbody) return;
+
+    if (list.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 24px; color: #94a3b8;">Belum ada catatan pengeluaran bahan pangan</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = list.map((so, idx) => `
+      <tr>
+        <td class="text-center font-mono" style="color: #64748b;">${idx + 1}</td>
+        <td><strong>${so.date}</strong></td>
+        <td>
+          <div style="font-weight: 700; color: #0f172a;">${so.item_name}</div>
+          ${so.notes ? `<small style="color: #64748b;">${so.notes}</small>` : ''}
+        </td>
+        <td><span class="badge ${getCategoryBadgeClass(so.category)}">${so.category}</span></td>
+        <td class="text-right font-mono" style="font-weight: 600;">${so.quantity} ${so.unit}</td>
+        <td class="text-right font-mono">${formatRupiah(so.unit_price)}</td>
+        <td class="text-right font-mono" style="font-weight: 700; color: #0284c7;">${formatRupiah(so.total_price)}</td>
+        <td>
+          <div style="font-weight: 600;">${so.purpose || 'Menu MBG'}</div>
+          ${so.recipient_school ? `<small style="color: #64748b;">Sekolah: ${so.recipient_school}</small>` : ''}
+        </td>
+        <td>${so.chef_or_staff || '-'}</td>
+        <td class="text-center">
+          <button class="btn btn-outline btn-sm" onclick="deleteStockOut(${so.id})" title="Hapus catatan" style="color: #dc2626;">
+            🗑️
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+  } catch (err) {
+    console.error('loadStockOut error:', err);
+  }
+}
+
+function openAddStockOutModal() {
+  document.getElementById('modal-add-stock-out').classList.add('active');
+  document.getElementById('so-date').value = AppState.customDate;
+  document.getElementById('so-name').focus();
+}
+
+function renderStockOutPresetChips() {
+  const container = document.getElementById('stock-out-preset-chips');
+  if (!container) return;
+
+  container.innerHTML = PRESET_INGREDIENTS.map(item => `
+    <span class="preset-chip" onclick="applyPresetStockOut('${item.name}')">
+      + ${item.name}
+    </span>
+  `).join('');
+}
+
+function applyPresetStockOut(name) {
+  const found = PRESET_INGREDIENTS.find(i => i.name === name);
+  if (!found) return;
+  document.getElementById('so-name').value = found.name;
+  document.getElementById('so-category').value = found.cat;
+  document.getElementById('so-unit').value = found.unit;
+  document.getElementById('so-price').value = found.price;
+  
+  const q = parseFloat(document.getElementById('so-qty').value) || 1;
+  document.getElementById('so-total').value = (q * found.price).toString();
+}
+
+async function handleSaveStockOut(e) {
+  e.preventDefault();
+  const date = document.getElementById('so-date').value;
+  const item_name = document.getElementById('so-name').value.trim();
+  const category = document.getElementById('so-category').value;
+  const quantity = parseFloat(document.getElementById('so-qty').value) || 0;
+  const unit = document.getElementById('so-unit').value;
+  const unit_price = parseFloat(document.getElementById('so-price').value) || 0;
+  const total_price = parseFloat(document.getElementById('so-total').value) || (quantity * unit_price);
+  const purpose = document.getElementById('so-purpose').value.trim();
+  const recipient_school = document.getElementById('so-recipient').value.trim();
+  const chef_or_staff = document.getElementById('so-chef').value.trim();
+  const notes = document.getElementById('so-notes').value.trim();
+
+  if (!item_name || quantity <= 0) {
+    showToast('Mohon isi nama bahan pangan dan kuantitas pengeluaran', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/stock-out', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date, item_name, category, quantity, unit, unit_price, total_price, purpose, recipient_school, chef_or_staff, notes
+      })
+    });
+    if (!res.ok) throw new Error('Gagal mencatat barang keluar');
+    
+    showToast('Pengeluaran barang berhasil dicatat dan nilai otomatis dihitung!');
+    closeAllModals();
+    document.getElementById('form-add-stock-out').reset();
+    loadStockOut();
+    loadDashboard();
+    if (AppState.activeTab === 'inventory') loadInventory();
+    if (AppState.activeTab === 'mutations') loadStockMutations();
+  } catch (err) {
+    showToast('Gagal mencatat pengeluaran: ' + err.message, 'error');
+  }
+}
+
+async function deleteStockOut(id) {
+  if (!confirm('Yakin ingin menghapus catatan barang keluar ini?')) return;
+  try {
+    const res = await fetch(`/api/stock-out/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Gagal menghapus');
+    showToast('Catatan barang keluar dihapus');
+    loadStockOut();
+    loadDashboard();
+  } catch (err) {
+    showToast('Gagal menghapus: ' + err.message, 'error');
+  }
+}
+
+// ==========================================
+// 2c. MUTASI KELUAR MASUK BARANG CONTROLLER
+// ==========================================
+async function loadStockMutations() {
+  try {
+    const search = document.getElementById('search-mutations') ? document.getElementById('search-mutations').value : '';
+    let url = `/api/stock-mutations?period=${AppState.currentPeriod}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+    AppState.mutations = data.items || [];
+    const t = data.totals || {};
+
+    // Update Summary Cards
+    const sumInQty = document.getElementById('mut-sum-in-qty');
+    const sumInVal = document.getElementById('mut-sum-in-val');
+    const sumOutQty = document.getElementById('mut-sum-out-qty');
+    const sumOutVal = document.getElementById('mut-sum-out-val');
+    const sumWasteQty = document.getElementById('mut-sum-waste-qty');
+    const sumWasteLoss = document.getElementById('mut-sum-waste-loss');
+    const sumRemQty = document.getElementById('mut-sum-rem-qty');
+    const sumRemVal = document.getElementById('mut-sum-rem-val');
+
+    if (sumInQty) sumInQty.textContent = `${(t.grand_in_qty || 0).toLocaleString('id-ID')} unit`;
+    if (sumInVal) sumInVal.textContent = formatRupiah(t.grand_in_value);
+    if (sumOutQty) sumOutQty.textContent = `${(t.grand_out_qty || 0).toLocaleString('id-ID')} unit`;
+    if (sumOutVal) sumOutVal.textContent = formatRupiah(t.grand_out_value);
+    if (sumWasteQty) sumWasteQty.textContent = `${(t.grand_waste_qty || 0).toLocaleString('id-ID')} unit`;
+    if (sumWasteLoss) sumWasteLoss.textContent = formatRupiah(t.grand_waste_loss);
+    if (sumRemQty) sumRemQty.textContent = `${(t.grand_remaining_qty || 0).toLocaleString('id-ID')} unit`;
+    if (sumRemVal) sumRemVal.textContent = `Estimasi: ${formatRupiah(t.grand_remaining_value)}`;
+
+    // Update Table Foot
+    const footInQty = document.getElementById('mut-foot-in-qty');
+    const footInVal = document.getElementById('mut-foot-in-val');
+    const footOutQty = document.getElementById('mut-foot-out-qty');
+    const footOutVal = document.getElementById('mut-foot-out-val');
+    const footWasteQty = document.getElementById('mut-foot-waste-qty');
+    const footRemQty = document.getElementById('mut-foot-rem-qty');
+
+    if (footInQty) footInQty.textContent = (t.grand_in_qty || 0).toLocaleString('id-ID');
+    if (footInVal) footInVal.textContent = formatRupiah(t.grand_in_value);
+    if (footOutQty) footOutQty.textContent = (t.grand_out_qty || 0).toLocaleString('id-ID');
+    if (footOutVal) footOutVal.textContent = formatRupiah(t.grand_out_value);
+    if (footWasteQty) footWasteQty.textContent = (t.grand_waste_qty || 0).toLocaleString('id-ID');
+    if (footRemQty) footRemQty.textContent = (t.grand_remaining_qty || 0).toLocaleString('id-ID');
+
+    const tbody = document.getElementById('mutations-table-body');
+    if (!tbody) return;
+
+    if (!data.items || data.items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 24px; color: #94a3b8;">Belum ada catatan mutasi stok pada periode ini</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.items.map((m, idx) => `
+      <tr>
+        <td class="text-center font-mono" style="color: #64748b;">${idx + 1}</td>
+        <td><strong>${m.item_name}</strong></td>
+        <td><span class="badge ${getCategoryBadgeClass(m.category)}">${m.category}</span></td>
+        <td>${m.unit}</td>
+        <td class="text-right font-mono" style="color: #16a34a; font-weight: 700;">${m.in_qty}</td>
+        <td class="text-right font-mono">${formatRupiah(m.in_value)}</td>
+        <td class="text-right font-mono" style="color: #0284c7; font-weight: 700;">${m.out_qty}</td>
+        <td class="text-right font-mono">${formatRupiah(m.out_value)}</td>
+        <td class="text-right font-mono" style="color: #dc2626;">${m.waste_qty}</td>
+        <td class="text-right font-mono" style="font-weight: 800; color: #d97706;">${m.remaining_qty}</td>
+        <td class="text-center">
+          <span class="badge" style="background: ${m.status_color === 'success' ? '#dcfce7' : m.status_color === 'warning' ? '#fef3c7' : '#fee2e2'}; color: ${m.status_color === 'success' ? '#15803d' : m.status_color === 'warning' ? '#b45309' : '#b91c1c'}; font-weight: 700;">
+            ${m.status}
+          </span>
+        </td>
+      </tr>
+    `).join('');
+
+  } catch (err) {
+    console.error('loadStockMutations error:', err);
   }
 }
 
@@ -625,6 +914,40 @@ async function loadFinances() {
     const res = await fetch(url);
     const list = await res.json();
     AppState.finances = list;
+
+    // Hitung otomatis total uang masuk, uang keluar, dan laba rugi bersih (Surplus/Defisit)
+    const totalIncome = list.filter(f => f.type === 'INCOME').reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
+    const totalExpense = list.filter(f => f.type === 'EXPENSE').reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
+    const netProfit = totalIncome - totalExpense;
+    const isProfit = netProfit >= 0;
+
+    // Update Summary Bar Keuangan
+    const sumIncEl = document.getElementById('fin-sum-income');
+    const sumExpEl = document.getElementById('fin-sum-expense');
+    const sumProfEl = document.getElementById('fin-sum-profit');
+    const sumBalEl = document.getElementById('fin-sum-balance');
+
+    if (sumIncEl) sumIncEl.textContent = `+ ${formatRupiah(totalIncome)}`;
+    if (sumExpEl) sumExpEl.textContent = `- ${formatRupiah(totalExpense)}`;
+    if (sumProfEl) {
+      sumProfEl.textContent = (isProfit ? '+ ' : '- ') + formatRupiah(Math.abs(netProfit));
+      sumProfEl.style.color = isProfit ? '#15803d' : '#b91c1c';
+    }
+    if (sumBalEl && AppState.stats) {
+      sumBalEl.textContent = formatRupiah(AppState.stats.cash_flow.current_balance);
+    }
+
+    // Update Table Foot Keuangan
+    const footIncEl = document.getElementById('fin-foot-income');
+    const footExpEl = document.getElementById('fin-foot-expense');
+    const footProfEl = document.getElementById('fin-foot-profit');
+
+    if (footIncEl) footIncEl.textContent = `+ ${formatRupiah(totalIncome)}`;
+    if (footExpEl) footExpEl.textContent = `- ${formatRupiah(totalExpense)}`;
+    if (footProfEl) {
+      footProfEl.textContent = (isProfit ? 'SURPLUS (+): ' : 'DEFISIT (-): ') + formatRupiah(Math.abs(netProfit));
+      footProfEl.style.color = isProfit ? '#15803d' : '#b91c1c';
+    }
 
     const tbody = document.getElementById('finance-table-body');
     if (!tbody) return;

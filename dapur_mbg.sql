@@ -38,7 +38,27 @@ CREATE TABLE IF NOT EXISTS `inventory` (
   INDEX `idx_inventory_name` (`item_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. Tabel Bahan Dibuang (Food Waste & Kerusakan Mutu)
+-- 3. Tabel Pengeluaran Bahan Pangan (Barang Keluar / Pemakaian Dapur)
+CREATE TABLE IF NOT EXISTS `stock_out` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `date` DATE NOT NULL,
+  `item_name` VARCHAR(191) NOT NULL,
+  `category` VARCHAR(100) NOT NULL,
+  `quantity` DECIMAL(10,2) NOT NULL,
+  `unit` VARCHAR(50) NOT NULL,
+  `unit_price` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `total_price` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  `purpose` VARCHAR(191) DEFAULT 'Pengolahan Menu MBG',
+  `recipient_school` VARCHAR(191) DEFAULT '',
+  `chef_or_staff` VARCHAR(191) DEFAULT '',
+  `notes` TEXT,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_so_date` (`date`),
+  INDEX `idx_so_cat` (`category`),
+  INDEX `idx_so_item` (`item_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. Tabel Bahan Dibuang (Food Waste & Kerusakan Mutu)
 CREATE TABLE IF NOT EXISTS `food_waste` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `date` DATE NOT NULL,
